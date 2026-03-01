@@ -1,1 +1,31 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cometa | Социальная сеть</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Подключаем шрифт -->
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
 
+    <header>
+        <div class="logo">Cometa 🌠</div>
+        <div class="user-info">Гость</div>
+    </header>
+
+    <main>
+        <div class="create-post">
+            <textarea id="postInput" placeholder="О чем думаешь, путник?"></textarea>
+            <button onclick="addPost()">Опубликовать</button>
+        </div>
+
+        <div class="feed" id="feed">
+            <!-- Сюда будут добавляться посты -->
+        </div>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>

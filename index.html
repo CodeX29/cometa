@@ -5,27 +5,109 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cometa | Социальная сеть</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Подключаем шрифт -->
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
 
     <header>
         <div class="logo">Cometa 🌠</div>
-        <div class="user-info">Гость</div>
+        <div class="user-info" id="userInfo">Гость</div>
     </header>
 
     <main>
         <div class="create-post">
+            <input type="text" id="username" placeholder="Твое имя" maxlength="20">
             <textarea id="postInput" placeholder="О чем думаешь, путник?"></textarea>
-            <button onclick="addPost()">Опубликовать</button>
+            <button onclick="addPost()" id="publishBtn">Опубликовать</button>
+            <div id="status"></div>
         </div>
 
         <div class="feed" id="feed">
-            <!-- Сюда будут добавляться посты -->
+            <div class="loading">Загрузка постов...</div>
         </div>
     </main>
 
-    <script src="script.js"></script>
+    <!-- Подключаем Firebase -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // 🔥 ВСТАВЬ СЮДА СВОЙ firebaseConfig ИЗ КОНСОЛИ FIREBASE 🔥
+        const firebaseConfig = {
+            apiKey: "AIzaSy...",
+            authDomain: "your-project.firebaseapp.com",
+            projectId: "your-project",
+            storageBucket: "your-project.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:abcdef"
+        };
+
+        // Инициализация
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Глобальные функции для HTML
+        window.addPost = async function() {
+            const username = document.getElementById('username').value.trim();
+            const text = document.getElementById('postInput').value.trim();
+            const status = document.getElementById('status');
+            const btn = document.getElementById('publishBtn');
+
+            if (!username) {
+                status.textContent = "⚠️ Введи имя!";
+                status.style.color = "#ff6b6b";
+                return;
+            }
+
+            if (!text) {
+                status.textContent = "⚠️ Пост не может быть пустым!";
+                status.style.color = "#ff6b6b";
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = "Публикация...";
+
+            try {
+                await addDoc(collection(db, "posts"), {
+                    username: username,
+                    text: text,
+                    timestamp: serverTimestamp()
+                });
+
+                document.getElementById('postInput').value = "";
+                status.textContent = "✅ Опубликовано!";
+                status.style.color = "#51cf66";
+            } catch (error) {
+                status.textContent = "❌ Ошибка: " + error.message;
+                status.style.color = "#ff6b6b";
+            }
+
+            btn.disabled = false;
+            btn.textContent = "Опубликовать";
+        };
+
+        // Загрузка постов в реальном времени
+        const q = query(collection(db, "posts"), orderBy("timestamp", "desc"));
+        
+        onSnapshot(q, (snapshot) => {
+            const feed = document.getElementById('feed');
+            feed.innerHTML = "";
+            
+            snapshot.forEach((doc) => {
+                const post = doc.data();
+                const date = post.timestamp ? new Date(post.timestamp.toDate()).toLocaleString() : "Только что";
+                
+                const postElement = document.createElement('div');
+                postElement.classList.add('post');
+                postElement.innerHTML = `
+                    <div class="post-author">@${post.username}</div>
+                    <div class="post-date">${date}</div>
+                    <div class="post-content">${post.text}</div>
+                `;
+                feed.appendChild(postElement);
+            });
+        });
+    </script>
 </body>
 </html>

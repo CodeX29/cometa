@@ -40,10 +40,11 @@ main {
     box-shadow: 0 4px 6px rgba(0,0,0,0.3);
 }
 
-#create-post input,
-#create-post textarea {
+/* 🔥 ИСПРАВЛЕНО: .create-post вместо #create-post */
+.create-post input,
+.create-post textarea {
     width: 100%;
-    background-color: #0f3460;
+    background-color: #0f3460; /* Темно-синий фон полей */
     border: none;
     border-radius: 8px;
     color: white;
@@ -53,18 +54,19 @@ main {
     margin-bottom: 10px;
 }
 
-input {
+.create-post input {
     height: 40px;
 }
 
-textarea {
+.create-post textarea {
     height: 80px;
     resize: none;
 }
 
-input:focus,
-textarea:focus {
+.create-post input:focus,
+.create-post textarea:focus {
     outline: 2px solid #a29bfe;
+    background-color: #1a4a8a; /* Чуть светлее при нажатии */
 }
 
 button {

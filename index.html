@@ -27,28 +27,33 @@
         </div>
     </main>
 
-    <!-- Подключаем Firebase -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, doc, updateDoc, increment, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         // 🔥 ВСТАВЬ СЮДА СВОЙ firebaseConfig ИЗ КОНСОЛИ FIREBASE 🔥
-        // For Firebase JS SDK v7.20.0 and later, measurementId is optional
         const firebaseConfig = {
-          apiKey: "AIzaSyCPk-RhF1sCezr6uuU0UUXbeeJilkNCwYQ",
-          authDomain: "cometa-network.firebaseapp.com",
-          projectId: "cometa-network",
-          storageBucket: "cometa-network.firebasestorage.app",
-          messagingSenderId: "781909887784",
-          appId: "1:781909887784:web:291dbff463adbdf6bd9e1d",
-          measurementId: "G-94JT37858S"
+            apiKey: "AIzaSy...",
+            authDomain: "your-project.firebaseapp.com",
+            projectId: "your-project",
+            storageBucket: "your-project.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:abcdef"
         };
 
-        // Инициализация
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        // Глобальные функции для HTML
+        // Получаем имя пользователя из localStorage (чтобы не вводить каждый раз)
+        let currentUser = localStorage.getItem('cometaUsername') || '';
+        document.getElementById('username').value = currentUser;
+
+        // Сохраняем имя при изменении
+        document.getElementById('username').addEventListener('change', (e) => {
+            currentUser = e.target.value.trim();
+            localStorage.setItem('cometaUsername', currentUser);
+        });
+
         window.addPost = async function() {
             const username = document.getElementById('username').value.trim();
             const text = document.getElementById('postInput').value.trim();
@@ -74,7 +79,9 @@
                 await addDoc(collection(db, "posts"), {
                     username: username,
                     text: text,
-                    timestamp: serverTimestamp()
+                    timestamp: serverTimestamp(),
+                    likes: 0,
+                    likedBy: []
                 });
 
                 document.getElementById('postInput').value = "";
@@ -89,23 +96,60 @@
             btn.textContent = "Опубликовать";
         };
 
-        // Загрузка постов в реальном времени
+        // Функция лайка
+        window.toggleLike = async function(postId, currentLikes, likedBy) {
+            if (!currentUser) {
+                alert("⚠️ Введи своё имя, чтобы ставить лайки!");
+                return;
+            }
+
+            const postRef = doc(db, "posts", postId);
+            
+            if (likedBy.includes(currentUser)) {
+                // Убрать лайк
+                await updateDoc(postRef, {
+                    likes: increment(-1),
+                    likedBy: arrayRemove(currentUser)
+                });
+            } else {
+                // Поставить лайк
+                await updateDoc(postRef, {
+                    likes: increment(1),
+                    likedBy: arrayUnion(currentUser)
+                });
+            }
+        };
+
+        // Загрузка постов
         const q = query(collection(db, "posts"), orderBy("timestamp", "desc"));
         
         onSnapshot(q, (snapshot) => {
             const feed = document.getElementById('feed');
             feed.innerHTML = "";
             
+            if (snapshot.empty) {
+                feed.innerHTML = '<div class="loading">Пока нет постов. Будь первым! 🌠</div>';
+                return;
+            }
+            
             snapshot.forEach((doc) => {
                 const post = doc.data();
                 const date = post.timestamp ? new Date(post.timestamp.toDate()).toLocaleString() : "Только что";
+                const isLiked = post.likedBy && post.likedBy.includes(currentUser);
                 
                 const postElement = document.createElement('div');
                 postElement.classList.add('post');
                 postElement.innerHTML = `
-                    <div class="post-author">@${post.username}</div>
-                    <div class="post-date">${date}</div>
+                    <div class="post-header">
+                        <div class="post-author">@${post.username}</div>
+                        <div class="post-date">${date}</div>
+                    </div>
                     <div class="post-content">${post.text}</div>
+                    <div class="post-actions">
+                        <button class="like-btn ${isLiked ? 'liked' : ''}" onclick="toggleLike('${doc.id}', ${post.likes || 0}, ${JSON.stringify(post.likedBy || [])})">
+                            ${isLiked ? '❤️' : '🤍'} <span class="like-count">${post.likes || 0}</span>
+                        </button>
+                    </div>
                 `;
                 feed.appendChild(postElement);
             });

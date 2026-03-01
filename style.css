@@ -40,11 +40,10 @@ main {
     box-shadow: 0 4px 6px rgba(0,0,0,0.3);
 }
 
-/* 🔥 ИСПРАВЛЕНО: .create-post вместо #create-post */
 .create-post input,
 .create-post textarea {
     width: 100%;
-    background-color: #0f3460; /* Темно-синий фон полей */
+    background-color: #0f3460;
     border: none;
     border-radius: 8px;
     color: white;
@@ -66,7 +65,7 @@ main {
 .create-post input:focus,
 .create-post textarea:focus {
     outline: 2px solid #a29bfe;
-    background-color: #1a4a8a; /* Чуть светлее при нажатии */
+    background-color: #1a4a8a;
 }
 
 button {
@@ -107,21 +106,62 @@ button:disabled {
     animation: fadeIn 0.5s ease;
 }
 
+.post-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
 .post-author {
     font-weight: 700;
     color: #a29bfe;
-    margin-bottom: 5px;
 }
 
 .post-date {
     font-size: 12px;
     color: #888;
-    margin-bottom: 10px;
 }
 
 .post-content {
     line-height: 1.5;
     word-wrap: break-word;
+    margin-bottom: 15px;
+}
+
+.post-actions {
+    border-top: 1px solid #2a2a4e;
+    padding-top: 15px;
+}
+
+.like-btn {
+    width: auto;
+    padding: 8px 16px;
+    background: transparent;
+    border: 2px solid #4b0082;
+    font-size: 16px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.like-btn:hover {
+    background-color: #4b0082;
+    transform: scale(1.05);
+}
+
+.like-btn.liked {
+    border-color: #ff6b6b;
+    color: #ff6b6b;
+}
+
+.like-btn.liked:hover {
+    background-color: #ff6b6b;
+    color: white;
+}
+
+.like-count {
+    font-weight: 700;
 }
 
 .loading {

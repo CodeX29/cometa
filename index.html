@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="mobile-web-app-capable" content="yes">
     <title>Cometa - Личные сообщения</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
@@ -314,6 +313,25 @@
             color: white;
         }
 
+        /* Экран авторизации */
+        #authContainer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .auth-card {
+            width: 400px;
+            max-width: 90%;
+        }
+
         /* Мобильная версия */
         @media (max-width: 768px) {
             .sidebar {
@@ -331,6 +349,9 @@
             }
             .message {
                 max-width: 85%;
+            }
+            #authContainer .auth-card {
+                width: 90%;
             }
         }
 
@@ -387,34 +408,66 @@
             margin-left: 5px;
         }
 
-        .message-delivered {
-            font-size: 0.7rem;
-            opacity: 0.6;
-            margin-left: 5px;
+        /* Скрытие элементов до авторизации */
+        #sidebar, #chatHeader, #chatInputContainer {
+            display: none;
         }
 
-        /* Анимации */
-        @keyframes pulse {
-            0%, 100% { opacity: 0.6; }
-            50% { opacity: 1; }
+        #sidebar.authenticated {
+            display: flex;
         }
 
-        .typing-indicator span {
-            display: inline-block;
-            animation: pulse 1.5s infinite;
-            animation-delay: 0.2s;
+        #chatHeader.authenticated, #chatInputContainer.authenticated {
+            display: flex;
         }
 
-        .typing-indicator span:nth-child(2) {
-            animation-delay: 0.4s;
+        #chatMessages.no-chat {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            color: #999;
+            text-align: center;
+            padding: 20px;
         }
 
-        .typing-indicator span:nth-child(3) {
-            animation-delay: 0.6s;
+        #chatMessages.no-chat i {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            opacity: 0.3;
         }
     </style>
 </head>
 <body>
+    <!-- Экран авторизации -->
+    <div id="authContainer">
+        <div class="card auth-card">
+            <div class="card-body p-4">
+                <h2 class="card-title text-center mb-4">🚀 Cometa</h2>
+                <div class="mb-3">
+                    <label class="form-label">📧 Email</label>
+                    <input type="email" class="form-control" id="authEmail" placeholder="user@example.com">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">🔒 Пароль</label>
+                    <input type="password" class="form-control" id="authPassword" placeholder="Минимум 6 символов">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">👤 @username (только при регистрации)</label>
+                    <div class="input-group">
+                        <span class="input-group-text">@</span>
+                        <input type="text" class="form-control" id="authUsername" placeholder="ваше_имя" maxlength="30">
+                    </div>
+                    <small class="text-muted">Только буквы, цифры и подчеркивания (3-30 символов)</small>
+                </div>
+                <button class="btn btn-primary w-100 mb-2" onclick="registerUser()">Зарегистрироваться</button>
+                <button class="btn btn-outline-secondary w-100" onclick="loginUser()">Войти</button>
+                <div id="authError" class="alert alert-danger mt-3" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
     <!-- Сайдбар: Список чатов -->
     <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
@@ -445,21 +498,13 @@
 
     <!-- Основной контент -->
     <div class="main-content">
-        <div class="chat-header" id="chatHeader" style="display: none;">
+        <div class="chat-header" id="chatHeader">
             <div class="chat-avatar-large" id="chatAvatar">U</div>
             <div class="chat-header-info">
                 <h3 id="chatName">Выберите чат</h3>
                 <div class="chat-header-status">
                     <span id="chatStatus">Онлайн</span>
-                    <span class="typing-indicator" id="typingIndicator" style="display: none;">
-                        печатает<span>.</span><span>.</span><span>.</span>
-                    </span>
                 </div>
-            </div>
-            <div class="ms-auto">
-                <button class="btn btn-sm btn-outline-secondary me-2">
-                    <i class="bi bi-info-circle"></i>
-                </button>
             </div>
         </div>
 
@@ -474,7 +519,7 @@
             </div>
         </div>
 
-        <div class="chat-input" id="chatInputContainer" style="display: none;">
+        <div class="chat-input" id="chatInputContainer">
             <div class="input-group">
                 <input type="text" class="form-control" id="messageInput" placeholder="Сообщение..." onkeypress="if(event.key==='Enter') sendMessage()">
                 <button class="btn btn-primary" onclick="sendMessage()">
@@ -485,59 +530,28 @@
     </div>
 
     <!-- Модальное окно поиска пользователей -->
-    <div class="modal fade" id="searchModal" tabindex="-1">
+    <div class="modal fade" id="searchModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">🔍 Поиск пользователей</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
                         <div class="input-group">
-                            <input type="text" class="form-control" id="searchUsername" placeholder="@username" oninput="searchUsers()">
-                            <button class="btn btn-outline-primary" type="button" onclick="searchUsers()">
-                                <i class="bi bi-search"></i>
-                            </button>
+                            <span class="input-group-text">@</span>
+                            <input type="text" class="form-control" id="searchUsername" placeholder="username" oninput="searchUsers()" maxlength="30">
                         </div>
-                        <small class="text-muted">Введите @username для поиска</small>
+                        <small class="text-muted mt-1">Введите имя пользователя без @</small>
                     </div>
                     
-                    <div id="searchResults">
+                    <div id="searchResults" class="mt-3">
                         <div class="text-center py-3 text-muted">
                             <i class="bi bi-search"></i>
                             <p class="mt-2">Введите имя пользователя для поиска</p>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Модальное окно установки username -->
-    <div class="modal fade" id="usernameModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">👤 Выберите ваш @username</h5>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label">Ваш уникальный @username</label>
-                        <div class="input-group">
-                            <span class="input-group-text">@</span>
-                            <input type="text" class="form-control" id="newUsername" placeholder="ваше_имя" maxlength="30">
-                        </div>
-                        <small class="text-muted">
-                            • Только буквы, цифры и подчеркивания<br>
-                            • От 3 до 30 символов<br>
-                            • Уникальный для всей сети
-                        </small>
-                    </div>
-                    <div id="usernameError" class="alert alert-danger" style="display: none;"></div>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-primary" onclick="setUsername()">Сохранить</button>
                 </div>
             </div>
         </div>
@@ -572,78 +586,98 @@
         let messagesRef = null;
         let onlineRef = null;
 
-        // Принудительное использование WebSocket
-        try {
-            database.INTERNAL.forceWebSockets();
-        } catch (e) {
-            console.warn("WebSocket недоступен, используем обычное подключение");
-        }
-
-        // Мониторинг подключения
-        database.ref('.info/connected').on('value', (snapshot) => {
-            if (snapshot.val()) {
-                console.log("✅ Подключено к Firebase");
-            } else {
-                console.warn("⚠️ Нет подключения к базе данных");
-            }
-        });
-
         // Отслеживание состояния авторизации
         auth.onAuthStateChanged((user) => {
             if (user) {
                 currentUser = user;
-                setupUserPresence();
-                checkUsernameSetup();
-                loadUserChats();
+                document.getElementById('authContainer').style.display = 'none';
+                document.getElementById('sidebar').classList.add('authenticated');
+                
+                // Проверяем наличие username
+                database.ref('users/' + currentUser.uid + '/username').once('value')
+                    .then((snapshot) => {
+                        if (!snapshot.exists() || !snapshot.val()) {
+                            // Показываем модальное окно для установки username
+                            alert('Пожалуйста, установите ваш @username в настройках профиля');
+                        }
+                        setupUserPresence();
+                        loadUserChats();
+                    });
             } else {
                 currentUser = null;
-                document.getElementById('sidebar').style.display = 'none';
-                document.getElementById('chatHeader').style.display = 'none';
-                document.getElementById('chatInputContainer').style.display = 'none';
-                showAuthPage();
+                document.getElementById('authContainer').style.display = 'block';
+                document.getElementById('sidebar').classList.remove('authenticated');
+                document.getElementById('chatHeader').classList.remove('authenticated');
+                document.getElementById('chatInputContainer').classList.remove('authenticated');
             }
         });
-
-        function showAuthPage() {
-            document.body.innerHTML = `
-                <div class="container" style="height: 100vh; display: flex; align-items: center; justify-content: center;">
-                    <div class="card" style="width: 400px;">
-                        <div class="card-body p-4">
-                            <h2 class="card-title text-center mb-4">🚀 Cometa</h2>
-                            <div class="mb-3">
-                                <label class="form-label">📧 Email</label>
-                                <input type="email" class="form-control" id="authEmail" placeholder="user@example.com">
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">🔒 Пароль</label>
-                                <input type="password" class="form-control" id="authPassword" placeholder="Минимум 6 символов">
-                            </div>
-                            <button class="btn btn-primary w-100 mb-2" onclick="registerUser()">Зарегистрироваться</button>
-                            <button class="btn btn-outline-secondary w-100" onclick="loginUser()">Войти</button>
-                            <div id="authError" class="alert alert-danger mt-3" style="display: none;"></div>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
 
         function registerUser() {
             const email = document.getElementById('authEmail').value.trim();
             const password = document.getElementById('authPassword').value.trim();
+            const username = document.getElementById('authUsername').value.trim().toLowerCase();
 
             if (!email || !password) {
-                showError('Заполните все поля');
+                showError('Заполните email и пароль');
                 return;
             }
 
-            auth.createUserWithEmailAndPassword(email, password)
-                .then((userCredential) => {
-                    // Пользователь создан, теперь нужно установить username
-                    currentUser = userCredential.user;
-                    showUsernameModal();
+            if (password.length < 6) {
+                showError('Пароль должен быть не менее 6 символов');
+                return;
+            }
+
+            if (!username) {
+                showError('Введите @username для регистрации');
+                return;
+            }
+
+            if (!/^[a-z0-9_]{3,30}$/.test(username)) {
+                showError('Username может содержать только буквы, цифры и подчеркивания (3-30 символов)');
+                return;
+            }
+
+            // Проверяем уникальность username
+            database.ref('usernames/' + username).once('value')
+                .then((snapshot) => {
+                    if (snapshot.exists()) {
+                        showError('Это имя уже занято, выберите другое');
+                        return;
+                    }
+
+                    // Регистрируем пользователя
+                    auth.createUserWithEmailAndPassword(email, password)
+                        .then((userCredential) => {
+                            const user = userCredential.user;
+                            
+                            // Сохраняем данные пользователя
+                            const userData = {
+                                uid: user.uid,
+                                email: email,
+                                username: username,
+                                displayName: username,
+                                createdAt: firebase.database.ServerValue.TIMESTAMP,
+                                lastSeen: firebase.database.ServerValue.TIMESTAMP
+                            };
+
+                            const updates = {};
+                            updates['users/' + user.uid] = userData;
+                            updates['usernames/' + username] = user.uid;
+
+                            return database.ref().update(updates);
+                        })
+                        .then(() => {
+                            hideError();
+                            document.getElementById('authEmail').value = '';
+                            document.getElementById('authPassword').value = '';
+                            document.getElementById('authUsername').value = '';
+                        })
+                        .catch((error) => {
+                            showError(error.message);
+                        });
                 })
                 .catch((error) => {
-                    showError(error.message);
+                    showError('Ошибка проверки username: ' + error.message);
                 });
         }
 
@@ -664,90 +698,41 @@
 
         function showError(message) {
             const errorDiv = document.getElementById('authError');
-            if (errorDiv) {
-                errorDiv.textContent = message;
-                errorDiv.style.display = 'block';
-                setTimeout(() => errorDiv.style.display = 'none', 5000);
-            }
-        }
-
-        // Проверка установки username
-        function checkUsernameSetup() {
-            database.ref('users/' + currentUser.uid + '/username').once('value')
-                .then((snapshot) => {
-                    if (!snapshot.exists() || !snapshot.val()) {
-                        showUsernameModal();
-                    } else {
-                        document.getElementById('sidebar').style.display = 'block';
-                    }
-                });
-        }
-
-        function showUsernameModal() {
-            const modal = new bootstrap.Modal(document.getElementById('usernameModal'));
-            modal.show();
-        }
-
-        function setUsername() {
-            const usernameInput = document.getElementById('newUsername');
-            const username = usernameInput.value.trim().toLowerCase();
-
-            if (!username) {
-                showErrorUsername('Введите имя пользователя');
-                return;
-            }
-
-            if (!/^[a-z0-9_]{3,30}$/.test(username)) {
-                showErrorUsername('Username может содержать только буквы, цифры и подчеркивания (3-30 символов)');
-                return;
-            }
-
-            // Проверяем уникальность
-            database.ref('usernames/' + username).once('value')
-                .then((snapshot) => {
-                    if (snapshot.exists()) {
-                        showErrorUsername('Это имя уже занято, выберите другое');
-                        return;
-                    }
-
-                    // Сохраняем данные пользователя
-                    const userData = {
-                        uid: currentUser.uid,
-                        email: currentUser.email,
-                        username: username,
-                        displayName: username,
-                        createdAt: firebase.database.ServerValue.TIMESTAMP,
-                        lastSeen: firebase.database.ServerValue.TIMESTAMP
-                    };
-
-                    const updates = {};
-                    updates['users/' + currentUser.uid] = userData;
-                    updates['usernames/' + username] = currentUser.uid;
-
-                    database.ref().update(updates)
-                        .then(() => {
-                            document.getElementById('usernameModal').querySelector('.btn-close')?.click();
-                            document.getElementById('sidebar').style.display = 'block';
-                            hideErrorUsername();
-                        })
-                        .catch((error) => {
-                            showErrorUsername('Ошибка: ' + error.message);
-                        });
-                });
-        }
-
-        function showErrorUsername(message) {
-            const errorDiv = document.getElementById('usernameError');
             errorDiv.textContent = message;
             errorDiv.style.display = 'block';
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 5000);
         }
 
-        function hideErrorUsername() {
-            document.getElementById('usernameError').style.display = 'none';
+        function hideError() {
+            document.getElementById('authError').style.display = 'none';
+        }
+
+        // Система онлайн-статуса
+        function setupUserPresence() {
+            if (!currentUser) return;
+            
+            const userId = currentUser.uid;
+            onlineRef = database.ref('online/' + userId);
+
+            // Устанавливаем онлайн при подключении
+            onlineRef.onDisconnect().remove();
+            onlineRef.set(true);
+
+            // Обновляем lastSeen при выходе
+            window.addEventListener('beforeunload', () => {
+                if (currentUser) {
+                    database.ref('users/' + currentUser.uid + '/lastSeen').set(Date.now());
+                    if (onlineRef) onlineRef.remove();
+                }
+            });
         }
 
         // Загрузка списка чатов
         function loadUserChats() {
+            if (!currentUser) return;
+            
             const chatList = document.getElementById('chatList');
             chatList.innerHTML = '<div class="text-center py-4 text-muted">Загрузка чатов...</div>';
 
@@ -756,7 +741,7 @@
                 .on('value', (snapshot) => {
                     chatList.innerHTML = '';
                     
-                    if (!snapshot.exists()) {
+                    if (!snapshot.exists() || snapshot.numChildren() === 0) {
                         chatList.innerHTML = '<div class="text-center py-4 text-muted">У вас пока нет чатов</div>';
                         return;
                     }
@@ -772,14 +757,12 @@
                     // Сортируем по времени (новые наверху)
                     chats.sort((a, b) => b.timestamp - a.timestamp);
 
-                    if (chats.length === 0) {
-                        chatList.innerHTML = '<div class="text-center py-4 text-muted">У вас пока нет чатов</div>';
-                        return;
-                    }
-
                     chats.forEach((chat) => {
                         addChatToSidebar(chat);
                     });
+                }, (error) => {
+                    console.error("Ошибка загрузки чатов:", error);
+                    chatList.innerHTML = `<div class="alert alert-danger m-3">Ошибка загрузки чатов: ${error.message}</div>`;
                 });
         }
 
@@ -791,18 +774,20 @@
 
             // Получаем имя партнера
             const partnerName = chat.partner?.displayName || chat.partner?.username || 'Неизвестный пользователь';
+            const isOnline = chat.partner?.online || false;
+            const timeString = formatTime(chat.timestamp);
 
             chatDiv.innerHTML = `
                 <div class="chat-avatar position-relative">
                     ${partnerName.charAt(0).toUpperCase()}
-                    <div class="online-indicator ${chat.partner?.online ? 'show' : ''}"></div>
+                    <div class="online-indicator ${isOnline ? 'show' : ''}"></div>
                 </div>
                 <div class="chat-info">
                     <span class="chat-name">${escapeHtml(partnerName)}</span>
                     <span class="chat-last-message">${escapeHtml(chat.lastMessage || 'Начните диалог...')}</span>
                 </div>
                 <div class="d-flex flex-column align-items-end">
-                    <span class="chat-time">${formatTime(chat.timestamp)}</span>
+                    <span class="chat-time">${timeString}</span>
                     ${chat.unreadCount > 0 ? `<span class="chat-unread">${chat.unreadCount}</span>` : ''}
                 </div>
             `;
@@ -811,6 +796,11 @@
         }
 
         function openChat(chatId, partner) {
+            if (!partner || !partner.uid) {
+                showError('Неверные данные пользователя');
+                return;
+            }
+
             currentChatId = chatId;
             currentChatPartner = partner;
 
@@ -819,22 +809,20 @@
             event.currentTarget.classList.add('active');
 
             // Показываем чат
-            document.getElementById('chatHeader').style.display = 'flex';
-            document.getElementById('chatInputContainer').style.display = 'block';
+            document.getElementById('chatHeader').classList.add('authenticated');
+            document.getElementById('chatInputContainer').classList.add('authenticated');
 
             // Обновляем информацию о чате
-            const partnerName = partner?.displayName || partner?.username || 'Пользователь';
+            const partnerName = partner.displayName || partner.username || 'Пользователь';
             document.getElementById('chatName').textContent = partnerName;
             document.getElementById('chatAvatar').textContent = partnerName.charAt(0).toUpperCase();
-            document.getElementById('chatStatus').textContent = partner?.online ? 'Онлайн' : 'Офлайн';
+            document.getElementById('chatStatus').textContent = partner.online ? 'Онлайн' : 'Был в сети ' + formatLastSeen(partner.lastSeen);
 
             // Загружаем сообщения
             loadChatMessages(chatId);
 
             // Сбрасываем счетчик непрочитанных
-            if (partner?.uid) {
-                database.ref(`user_chats/${currentUser.uid}/${chatId}/unreadCount`).set(0);
-            }
+            database.ref(`user_chats/${currentUser.uid}/${chatId}/unreadCount`).set(0);
         }
 
         function loadChatMessages(chatId) {
@@ -852,7 +840,7 @@
             messagesRef.on('value', (snapshot) => {
                 messagesDiv.innerHTML = '';
 
-                if (!snapshot.exists()) {
+                if (!snapshot.exists() || snapshot.numChildren() === 0) {
                     messagesDiv.innerHTML = `
                         <div class="empty-chat">
                             <i class="bi bi-chat-dots"></i>
@@ -878,6 +866,9 @@
                 setTimeout(() => {
                     messagesDiv.scrollTop = messagesDiv.scrollHeight;
                 }, 100);
+            }, (error) => {
+                console.error("Ошибка загрузки сообщений:", error);
+                messagesDiv.innerHTML = `<div class="alert alert-danger m-3">Ошибка: ${error.message}</div>`;
             });
         }
 
@@ -908,7 +899,7 @@
         }
 
         function sendMessage() {
-            if (!currentChatId || !currentChatPartner) {
+            if (!currentChatId || !currentChatPartner || !currentUser) {
                 return;
             }
 
@@ -916,14 +907,17 @@
             const text = messageInput.value.trim();
 
             if (!text) return;
+            if (text.length > 1000) {
+                showError('Сообщение слишком длинное (макс. 1000 символов)');
+                return;
+            }
 
             const messageData = {
                 senderId: currentUser.uid,
                 senderName: currentUser.displayName || currentUser.email.split('@')[0],
                 recipientId: currentChatPartner.uid,
                 text: text,
-                timestamp: firebase.database.ServerValue.TIMESTAMP,
-                delivered: false
+                timestamp: firebase.database.ServerValue.TIMESTAMP
             };
 
             // Отправляем сообщение
@@ -938,7 +932,8 @@
                             uid: currentChatPartner.uid,
                             username: currentChatPartner.username,
                             displayName: currentChatPartner.displayName,
-                            online: currentChatPartner.online || false
+                            online: currentChatPartner.online || false,
+                            lastSeen: currentChatPartner.lastSeen || Date.now()
                         }
                     };
 
@@ -949,10 +944,18 @@
                     });
 
                     // Для партнера по чату
-                    database.ref(`user_chats/${currentChatPartner.uid}/${currentChatId}`).update({
-                        ...chatInfo,
-                        unreadCount: (currentChatPartner.uid !== currentUser.uid) ? 
-                            firebase.database.ServerValue.increment(1) : 0
+                    database.ref(`user_chats/${currentChatPartner.uid}/${currentChatId}`).transaction((currentData) => {
+                        if (currentData === null) {
+                            return {
+                                ...chatInfo,
+                                unreadCount: 1
+                            };
+                        } else {
+                            return {
+                                ...chatInfo,
+                                unreadCount: (currentData.unreadCount || 0) + 1
+                            };
+                        }
                     });
 
                     messageInput.value = '';
@@ -960,6 +963,7 @@
                 })
                 .catch((error) => {
                     console.error("Ошибка отправки:", error);
+                    showError('Не удалось отправить сообщение: ' + error.message);
                 });
         }
 
@@ -967,12 +971,24 @@
         function showSearchModal() {
             const modal = new bootstrap.Modal(document.getElementById('searchModal'));
             modal.show();
-            document.getElementById('searchUsername').focus();
+            document.getElementById('searchUsername').value = '';
+            document.getElementById('searchResults').innerHTML = `
+                <div class="text-center py-3 text-muted">
+                    <i class="bi bi-search"></i>
+                    <p class="mt-2">Введите имя пользователя для поиска</p>
+                </div>
+            `;
+            setTimeout(() => {
+                document.getElementById('searchUsername').focus();
+            }, 300);
         }
 
         function searchUsers() {
             const searchInput = document.getElementById('searchUsername');
-            const username = searchInput.value.trim().toLowerCase().replace('@', '');
+            let username = searchInput.value.trim().toLowerCase();
+            
+            // Убираем @ если пользователь ввел
+            username = username.replace('@', '');
 
             const resultsDiv = document.getElementById('searchResults');
 
@@ -991,6 +1007,11 @@
                 return;
             }
 
+            if (!/^[a-z0-9_]+$/.test(username)) {
+                resultsDiv.innerHTML = '<div class="alert alert-warning">Разрешены только буквы, цифры и подчеркивания</div>';
+                return;
+            }
+
             // Ищем username
             database.ref('usernames/' + username).once('value')
                 .then((snapshot) => {
@@ -1006,6 +1027,12 @@
 
                     const userId = snapshot.val();
                     
+                    // Проверяем, не является ли это текущий пользователь
+                    if (userId === currentUser.uid) {
+                        resultsDiv.innerHTML = '<div class="alert alert-info">Это ваш аккаунт!</div>';
+                        return;
+                    }
+
                     // Получаем данные пользователя
                     database.ref('users/' + userId).once('value')
                         .then((userSnapshot) => {
@@ -1016,12 +1043,6 @@
 
                             const userData = userSnapshot.val();
                             
-                            // Проверяем, не является ли это текущий пользователь
-                            if (userId === currentUser.uid) {
-                                resultsDiv.innerHTML = '<div class="alert alert-info">Это ваш аккаунт!</div>';
-                                return;
-                            }
-
                             // Проверяем, есть ли уже чат с этим пользователем
                             database.ref(`user_chats/${currentUser.uid}`)
                                 .orderByChild('partner/uid')
@@ -1036,8 +1057,10 @@
                                         });
                                     }
 
+                                    const buttonText = existingChatId ? 'Открыть чат' : 'Написать';
+                                    
                                     resultsDiv.innerHTML = `
-                                        <div class="user-search-result" onclick="startChatWithUser('${userId}', '${escapeHtml(userData.username)}', '${escapeHtml(userData.displayName)}', '${existingChatId}')">
+                                        <div class="user-search-result" onclick="startChatWithUser('${userId}', '${escapeHtml(userData.username)}', '${escapeHtml(userData.displayName)}', '${existingChatId || ''}')">
                                             <div class="d-flex align-items-center">
                                                 <div class="user-search-avatar">
                                                     ${userData.displayName.charAt(0).toUpperCase()}
@@ -1046,7 +1069,7 @@
                                                     <div class="fw-bold">${escapeHtml(userData.displayName)}</div>
                                                     <div class="text-muted">@${escapeHtml(userData.username)}</div>
                                                 </div>
-                                                ${existingChatId ? '<span class="badge bg-primary">Открыть чат</span>' : '<button class="btn btn-sm btn-primary">Написать</button>'}
+                                                <button class="btn btn-sm btn-primary">${buttonText}</button>
                                             </div>
                                         </div>
                                     `;
@@ -1055,19 +1078,26 @@
                 })
                 .catch((error) => {
                     console.error("Ошибка поиска:", error);
-                    resultsDiv.innerHTML = '<div class="alert alert-danger">Ошибка поиска пользователя</div>';
+                    resultsDiv.innerHTML = '<div class="alert alert-danger">Ошибка поиска: ' + error.message + '</div>';
                 });
         }
 
         function startChatWithUser(userId, username, displayName, existingChatId) {
             // Закрываем модальное окно
-            document.getElementById('searchModal').querySelector('.btn-close')?.click();
+            const modal = bootstrap.Modal.getInstance(document.getElementById('searchModal'));
+            modal.hide();
 
             if (existingChatId) {
                 // Открываем существующий чат
                 database.ref(`user_chats/${currentUser.uid}/${existingChatId}/partner`).once('value')
                     .then((snapshot) => {
-                        openChat(existingChatId, snapshot.val());
+                        const partnerData = snapshot.val() || {
+                            uid: userId,
+                            username: username,
+                            displayName: displayName,
+                            online: false
+                        };
+                        openChat(existingChatId, partnerData);
                     });
                 return;
             }
@@ -1080,7 +1110,8 @@
                 uid: userId,
                 username: username,
                 displayName: displayName,
-                online: false // Будет обновлено позже
+                online: false,
+                lastSeen: Date.now()
             };
 
             // Информация о чате
@@ -1098,7 +1129,7 @@
             updates[`user_chats/${currentUser.uid}/${chatId}`] = chatInfo;
             updates[`user_chats/${userId}/${chatId}`] = {
                 ...chatInfo,
-                unreadCount: 0
+                unreadCount: 1 // Первое сообщение будет от нас, поэтому для партнера +1
             };
 
             database.ref().update(updates)
@@ -1107,24 +1138,8 @@
                 })
                 .catch((error) => {
                     console.error("Ошибка создания чата:", error);
-                    alert('Не удалось создать чат. Попробуйте еще раз.');
+                    alert('Не удалось создать чат: ' + error.message);
                 });
-        }
-
-        // Система онлайн-статуса
-        function setupUserPresence() {
-            const userId = currentUser.uid;
-            onlineRef = database.ref('online/' + userId);
-
-            // Устанавливаем онлайн при подключении
-            onlineRef.onDisconnect().remove();
-            onlineRef.set(true);
-
-            // Обновляем lastSeen при выходе
-            window.addEventListener('beforeunload', () => {
-                database.ref('users/' + userId + '/lastSeen').set(Date.now());
-                onlineRef.remove();
-            });
         }
 
         // Фильтрация чатов
@@ -1134,7 +1149,7 @@
 
             chatItems.forEach(item => {
                 const chatName = item.querySelector('.chat-name').textContent.toLowerCase();
-                const chatLastMessage = item.querySelector('.chat-last-message').textContent.toLowerCase();
+                const chatLastMessage = item.querySelector('.chat-last-message')?.textContent.toLowerCase() || '';
                 
                 if (chatName.includes(searchTerm) || chatLastMessage.includes(searchTerm)) {
                     item.style.display = 'flex';
@@ -1177,11 +1192,27 @@
             return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
         }
 
+        function formatLastSeen(timestamp) {
+            if (!timestamp) return 'давно';
+            
+            const date = new Date(timestamp);
+            const now = new Date();
+            const diffMinutes = Math.floor((now - date) / 60000);
+            
+            if (diffMinutes < 1) return 'только что';
+            if (diffMinutes < 60) return `${diffMinutes} мин назад`;
+            if (diffMinutes < 1440) return `${Math.floor(diffMinutes / 60)} ч назад`;
+            
+            return formatTime(timestamp);
+        }
+
         function logout() {
             if (onlineRef) {
                 onlineRef.remove();
             }
-            database.ref('users/' + currentUser.uid + '/lastSeen').set(Date.now());
+            if (currentUser) {
+                database.ref('users/' + currentUser.uid + '/lastSeen').set(Date.now());
+            }
             auth.signOut();
         }
 
@@ -1193,9 +1224,9 @@
             }
         });
 
-        // Автофокус на поле сообщения
-        document.getElementById('messageInput')?.addEventListener('focus', () => {
-            // Можно добавить индикацию "печатает"
+        // Автофокус на поле сообщения при открытии чата
+        document.getElementById('messageInput').addEventListener('focus', () => {
+            // Можно добавить индикацию "печатает" в будущем
         });
     </script>
 </body>

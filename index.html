@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cometa - Социальная сеть</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Встроенные стили -->
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .message-container {
+            max-height: 500px;
+            overflow-y: auto;
+            padding: 10px;
+            background: white;
+            border-radius: 10px;
+            margin: 10px 0;
+        }
+        .message {
+            margin-bottom: 15px;
+            padding: 12px 15px;
+            border-radius: 15px;
+            max-width: 80%;
+            position: relative;
+            word-wrap: break-word;
+        }
+        .message.own {
+            background-color: #4CAF50;
+            color: white;
+            margin-left: auto;
+            border-bottom-right-radius: 5px;
+        }
+        .message.other {
+            background-color: #f0f0f0;
+            color: #333;
+            border-bottom-left-radius: 5px;
+        }
+        .message-time {
+            font-size: 0.75em;
+            opacity: 0.8;
+            margin-top: 4px;
+            text-align: right;
+        }
+        .message-user {
+            font-weight: bold;
+            margin-bottom: 3px;
+            font-size: 0.9em;
+        }
+        #authContainer {
+            margin-top: 50px;
+        }
+        #chatContainer {
+            margin-top: 20px;
+        }
+        .alert {
+            margin-top: 15px;
+        }
+        .card {
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            border: none;
+            border-radius: 15px;
+        }
+        header {
+            color: white;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+        #messages {
+            min-height: 300px;
+        }
+        .no-messages {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            color: #999;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="text-center my-4">
+            <h1 class="display-4">☄️ Cometa</h1>
+            <p class="lead">Социальная сеть нового поколения</p>
+        </header>
+
+        <!-- Форма авторизации -->
+        <div id="authContainer">
+            <div class="card mx-auto" style="max-width: 500px;">
+                <div class="card-body p-4">
+                    <h2 class="card-title text-center mb-4">🚀 Добро пожаловать в Cometa</h2>
+                    
+                    <div id="authForm">
+                        <div class="mb-3">
+                            <label for="email" class="form-label">📧 Email</label>
+                            <input type="email" class="form-control" id="email" placeholder="user@example.com">
+                        </div>
+                        <div class="mb-3">
+                            <label for="password" class="form-label">🔒 Пароль</label>
+                            <input type="password" class="form-control" id="password" placeholder="Минимум 6 символов">
+                        </div>
+                        <div class="mb-4">
+                            <label for="username" class="form-label">👤 Имя пользователя</label>
+                            <input type="text" class="form-control" id="username" placeholder="Ваше имя">
+                        </div>
+                        <button class="btn btn-primary w-100 mb-2 py-2 fw-bold" onclick="registerUser()">Зарегистрироваться</button>
+                        <button class="btn btn-outline-secondary w-100 py-2" onclick="loginUser()">Уже есть аккаунт? Войти</button>
+                        <div id="authError" class="alert alert-danger mt-3" style="display: none;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Чат -->
+        <div id="chatContainer" style="display: none;">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h3 class="mb-0">💬 Общий чат</h3>
+                        <button class="btn btn-light btn-sm" onclick="logout()">🚪 Выйти</button>
+                    </div>
+                    <div class="mt-2">
+                        <span id="currentUser" class="badge bg-light text-dark px-3 py-2"></span>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div id="messages" class="message-container">
+                        <div class="no-messages">Пока нет сообщений. Будьте первым!</div>
+                    </div>
+                </div>
+                <div class="card-footer p-3">
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="messageInput" placeholder="Напишите сообщение..." onkeypress="if(event.key==='Enter') sendMessage()">
+                        <button class="btn btn-primary" onclick="sendMessage()">➤</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    
+    <!-- Основной код приложения -->
+    <script>
+        // ⚠️ ⚠️ ⚠️ ВАЖНО: ЗАМЕНИТЕ ЭТИ ЗНАЧЕНИЯ НА СВОИ ИЗ FIREBASE CONSOLE ⚠️ ⚠️ ⚠️
+        // Инструкция: https://console.firebase.google.com/project/_/settings/general/
+        const firebaseConfig = {
+            apiKey: "AIzaSyC...", // ← СКОПИРУЙТЕ СВОЙ
+            authDomain: "cometa-social.firebaseapp.com", // ← СКОПИРУЙТЕ СВОЙ
+            databaseURL: "https://cometa-social-default-rtdb.firebaseio.com", // ← СКОПИРУЙТЕ СВОЙ
+            projectId: "cometa-social", // ← СКОПИРУЙТЕ СВОЙ
+            storageBucket: "cometa-social.appspot.com", // ← СКОПИРУЙТЕ СВОЙ
+            messagingSenderId: "123456789", // ← СКОПИРУЙТЕ СВОЙ
+            appId: "1:123456789:web:abcdef123456" // ← СКОПИРУЙТЕ СВОЙ
+        };
+
+        // Инициализация Firebase
+        try {
+            firebase.initializeApp(firebaseConfig);
+            console.log("Firebase инициализирован успешно");
+        } catch (e) {
+            console.error("Ошибка инициализации Firebase:", e);
+            alert("Ошибка настройки Firebase! Проверьте конфигурацию в коде.");
+        }
+
+        const auth = firebase.auth();
+        const database = firebase.database();
+        let currentUser = null;
+
+        // Отслеживание состояния авторизации
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                currentUser = user;
+                // Получаем имя пользователя из базы
+                database.ref('users/' + user.uid + '/username').once('value')
+                    .then((snapshot) => {
+                        const username = snapshot.val() || user.email.split('@')[0];
+                        document.getElementById('currentUser').textContent = `@${username}`;
+                    });
+                
+                document.getElementById('authContainer').style.display = 'none';
+                document.getElementById('chatContainer').style.display = 'block';
+                loadMessages();
+            } else {
+                document.getElementById('authContainer').style.display = 'block';
+                document.getElementById('chatContainer').style.display = 'none';
+                currentUser = null;
+            }
+        });
+
+        function registerUser() {
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value.trim();
+            const username = document.getElementById('username').value.trim();
+
+            if (!email || !password || !username) {
+                showError('Пожалуйста, заполните все поля');
+                return;
+            }
+            
+            if (password.length < 6) {
+                showError('Пароль должен быть не менее 6 символов');
+                return;
+            }
+
+            document.getElementById('authError').style.display = 'none';
+            
+            auth.createUserWithEmailAndPassword(email, password)
+                .then((userCredential) => {
+                    const user = userCredential.user;
+                    // Сохраняем имя пользователя
+                    return database.ref('users/' + user.uid).set({
+                        username: username,
+                        email: email,
+                        createdAt: firebase.database.ServerValue.TIMESTAMP
+                    });
+                })
+                .then(() => {
+                    hideError();
+                    // Очищаем поля
+                    document.getElementById('email').value = '';
+                    document.getElementById('password').value = '';
+                    document.getElementById('username').value = '';
+                })
+                .catch((error) => {
+                    showError(error.message);
+                });
+        }
+
+        function loginUser() {
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value.trim();
+
+            if (!email || !password) {
+                showError('Пожалуйста, заполните email и пароль');
+                return;
+            }
+
+            document.getElementById('authError').style.display = 'none';
+            
+            auth.signInWithEmailAndPassword(email, password)
+                .catch((error) => {
+                    showError(error.message);
+                });
+        }
+
+        function logout() {
+            auth.signOut();
+        }
+
+        function sendMessage() {
+            if (!currentUser) {
+                showError('Вы не авторизованы!');
+                return;
+            }
+            
+            const messageInput = document.getElementById('messageInput');
+            const message = messageInput.value.trim();
+
+            if (!message) return;
+            if (message.length > 1000) {
+                showError('Сообщение слишком длинное (макс. 1000 символов)');
+                return;
+            }
+
+            // Получаем имя пользователя
+            const userId = currentUser.uid;
+            const usernameRef = database.ref('users/' + userId + '/username');
+
+            usernameRef.once('value').then((snapshot) => {
+                const username = snapshot.val() || currentUser.email.split('@')[0];
+                
+                // Сохраняем сообщение
+                database.ref('messages').push({
+                    userId: userId,
+                    username: username,
+                    message: message,
+                    timestamp: firebase.database.ServerValue.TIMESTAMP
+                });
+
+                // Очищаем поле ввода
+                messageInput.value = '';
+            }).catch((error) => {
+                console.error("Ошибка отправки сообщения:", error);
+                showError('Не удалось отправить сообщение');
+            });
+        }
+
+        function loadMessages() {
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML = '<div class="no-messages">Загрузка сообщений...</div>';
+            
+            const messagesRef = database.ref('messages').limitToLast(50); // Последние 50 сообщений
+            
+            // Загружаем существующие сообщения
+            messagesRef.once('value').then((snapshot) => {
+                messagesDiv.innerHTML = '';
+                
+                if (snapshot.exists()) {
+                    snapshot.forEach((childSnapshot) => {
+                        const messageData = childSnapshot.val();
+                        addMessageToDOM(messageData);
+                    });
+                } else {
+                    messagesDiv.innerHTML = '<div class="no-messages">Пока нет сообщений. Будьте первым!</div>';
+                }
+                
+                // Прокручиваем вниз
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            });
+
+            // Слушаем новые сообщения
+            messagesRef.on('child_added', (snapshot) => {
+                const messageData = snapshot.val();
+                addMessageToDOM(messageData);
+                
+                // Автопрокрутка вниз
+                setTimeout(() => {
+                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                }, 100);
+            });
+        }
+
+        function addMessageToDOM(messageData) {
+            const messagesDiv = document.getElementById('messages');
+            // Убираем placeholder если есть
+            if (messagesDiv.querySelector('.no-messages')) {
+                messagesDiv.innerHTML = '';
+            }
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message ' + (messageData.userId === currentUser?.uid ? 'own' : 'other');
+
+            // Форматируем время
+            const date = new Date(messageData.timestamp);
+            const timeString = date.toLocaleTimeString('ru-RU', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                hour12: false
+            });
+
+            // Экранируем текст от XSS
+            const safeMessage = escapeHtml(messageData.message);
+            const safeUsername = escapeHtml(messageData.username);
+
+            messageDiv.innerHTML = `
+                <div class="message-user">${safeUsername}</div>
+                <div class="message-content">${safeMessage}</div>
+                <div class="message-time">${timeString}</div>
+            `;
+
+            messagesDiv.appendChild(messageDiv);
+        }
+
+        // Защита от XSS
+        function escapeHtml(unsafe) {
+            if (typeof unsafe !== 'string') return '';
+            return unsafe
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('authError');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            // Автоматическое скрытие через 5 секунд
+            setTimeout(() => {
+                if (errorDiv.textContent === message) {
+                    hideError();
+                }
+            }, 5000);
+        }
+
+        function hideError() {
+            document.getElementById('authError').style.display = 'none';
+        }
+
+        // Горячая клавиша: Ctrl+Enter для отправки
+        document.getElementById('messageInput').addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>

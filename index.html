@@ -150,8 +150,7 @@
     
     <!-- Основной код приложения -->
     <script>
-        // ⚠️ ⚠️ ⚠️ ВАЖНО: ЗАМЕНИТЕ ЭТИ ЗНАЧЕНИЯ НА СВОИ ИЗ FIREBASE CONSOLE ⚠️ ⚠️ ⚠️
-        // Инструкция: https://console.firebase.google.com/project/_/settings/general/
+        // ⚠️ ЗАМЕНИТЕ НА СВОИ ДАННЫЕ ИЗ FIREBASE CONSOLE ⚠️
         const firebaseConfig = {
           apiKey: "AIzaSyDl2OUYwGTI0wZzxtcjy0LdbR6oJpCPtk0",
           authDomain: "cometa-11f1a.firebaseapp.com",
@@ -162,24 +161,42 @@
           appId: "1:310146582439:web:1dc3be9cbcb47d592bd882",
           measurementId: "G-VDQ30Y5S2L"
         };
+    
         // Инициализация Firebase
         try {
             firebase.initializeApp(firebaseConfig);
-            console.log("Firebase инициализирован успешно");
+            console.log("✅ Firebase инициализирован");
         } catch (e) {
-            console.error("Ошибка инициализации Firebase:", e);
-            alert("Ошибка настройки Firebase! Проверьте конфигурацию в коде.");
+            console.error("❌ Ошибка инициализации Firebase:", e);
+            alert("Ошибка настройки Firebase! Проверьте конфигурацию.");
         }
-
+    
         const auth = firebase.auth();
         const database = firebase.database();
         let currentUser = null;
-
+        let messagesRef = null;
+    
+        // 🔑 КРИТИЧЕСКИ ВАЖНО: Принудительная настройка транспорта для обхода блокировок
+        database.INTERNAL.forceWebSockets(); // Используем только WebSocket (надёжнее для реального времени)
+        // Альтернатива, если не работает: 
+        // database.INTERNAL.forceLongPolling(); // Используем long-polling (работает везде, но медленнее)
+    
+        // Мониторинг подключения к базе данных
+        database.ref('.info/connected').on('value', (snapshot) => {
+            if (snapshot.val() === false) {
+                console.warn("⚠️ Нет подключения к базе данных Firebase");
+                showConnectionStatus("Нет подключения к серверу", "danger");
+            } else {
+                console.log("✅ Подключение к базе данных установлено");
+                hideConnectionStatus();
+            }
+        });
+    
         // Отслеживание состояния авторизации
         auth.onAuthStateChanged((user) => {
             if (user) {
                 currentUser = user;
-                // Получаем имя пользователя из базы
+                // Получаем имя пользователя
                 database.ref('users/' + user.uid + '/username').once('value')
                     .then((snapshot) => {
                         const username = snapshot.val() || user.email.split('@')[0];
@@ -190,17 +207,22 @@
                 document.getElementById('chatContainer').style.display = 'block';
                 loadMessages();
             } else {
+                // Отписываемся от обновлений при выходе
+                if (messagesRef) {
+                    messagesRef.off('value');
+                    messagesRef = null;
+                }
                 document.getElementById('authContainer').style.display = 'block';
                 document.getElementById('chatContainer').style.display = 'none';
                 currentUser = null;
             }
         });
-
+    
         function registerUser() {
             const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value.trim();
             const username = document.getElementById('username').value.trim();
-
+    
             if (!email || !password || !username) {
                 showError('Пожалуйста, заполните все поля');
                 return;
@@ -210,13 +232,12 @@
                 showError('Пароль должен быть не менее 6 символов');
                 return;
             }
-
+    
             document.getElementById('authError').style.display = 'none';
             
             auth.createUserWithEmailAndPassword(email, password)
                 .then((userCredential) => {
                     const user = userCredential.user;
-                    // Сохраняем имя пользователя
                     return database.ref('users/' + user.uid).set({
                         username: username,
                         email: email,
@@ -225,7 +246,6 @@
                 })
                 .then(() => {
                     hideError();
-                    // Очищаем поля
                     document.getElementById('email').value = '';
                     document.getElementById('password').value = '';
                     document.getElementById('username').value = '';
@@ -234,16 +254,16 @@
                     showError(error.message);
                 });
         }
-
+    
         function loginUser() {
             const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value.trim();
-
+    
             if (!email || !password) {
                 showError('Пожалуйста, заполните email и пароль');
                 return;
             }
-
+    
             document.getElementById('authError').style.display = 'none';
             
             auth.signInWithEmailAndPassword(email, password)
@@ -251,11 +271,16 @@
                     showError(error.message);
                 });
         }
-
+    
         function logout() {
+            // Отписываемся от обновлений
+            if (messagesRef) {
+                messagesRef.off('value');
+                messagesRef = null;
+            }
             auth.signOut();
         }
-
+    
         function sendMessage() {
             if (!currentUser) {
                 showError('Вы не авторизованы!');
@@ -264,103 +289,112 @@
             
             const messageInput = document.getElementById('messageInput');
             const message = messageInput.value.trim();
-
+    
             if (!message) return;
             if (message.length > 1000) {
                 showError('Сообщение слишком длинное (макс. 1000 символов)');
                 return;
             }
-
-            // Получаем имя пользователя
+    
             const userId = currentUser.uid;
             const usernameRef = database.ref('users/' + userId + '/username');
-
+    
             usernameRef.once('value').then((snapshot) => {
                 const username = snapshot.val() || currentUser.email.split('@')[0];
                 
-                // Сохраняем сообщение
-                database.ref('messages').push({
+                // ⚡ КРИТИЧЕСКИ ВАЖНО: Используем транзакцию для надёжной записи
+                database.ref('messages').push().set({
                     userId: userId,
                     username: username,
                     message: message,
                     timestamp: firebase.database.ServerValue.TIMESTAMP
+                }, (error) => {
+                    if (error) {
+                        console.error("Ошибка отправки:", error);
+                        showError('Не удалось отправить сообщение. Попробуйте ещё раз.');
+                    } else {
+                        console.log("✅ Сообщение отправлено");
+                    }
                 });
-
-                // Очищаем поле ввода
+    
                 messageInput.value = '';
+                messageInput.focus();
             }).catch((error) => {
-                console.error("Ошибка отправки сообщения:", error);
+                console.error("Ошибка получения имени:", error);
                 showError('Не удалось отправить сообщение');
             });
         }
-
+    
+        // 🔥 ГЛАВНОЕ ИСПРАВЛЕНИЕ: Используем ЕДИНУЮ подписку через 'value'
         function loadMessages() {
             const messagesDiv = document.getElementById('messages');
             messagesDiv.innerHTML = '<div class="no-messages">Загрузка сообщений...</div>';
             
-            const messagesRef = database.ref('messages').limitToLast(50); // Последние 50 сообщений
+            // Отписываемся от предыдущих подписок
+            if (messagesRef) {
+                messagesRef.off('value');
+            }
             
-            // Загружаем существующие сообщения
-            messagesRef.once('value').then((snapshot) => {
+            // Подписываемся ТОЛЬКО на 'value' — это гарантирует полную синхронизацию
+            messagesRef = database.ref('messages').orderByChild('timestamp').limitToLast(50);
+            
+            messagesRef.on('value', (snapshot) => {
+                console.log(`📡 Получено обновление: ${snapshot.numChildren()} сообщений`);
                 messagesDiv.innerHTML = '';
                 
-                if (snapshot.exists()) {
+                if (snapshot.exists() && snapshot.numChildren() > 0) {
+                    // Сортируем сообщения по времени (на случай если порядок нарушен)
+                    const messages = [];
                     snapshot.forEach((childSnapshot) => {
-                        const messageData = childSnapshot.val();
+                        messages.push(childSnapshot.val());
+                    });
+                    
+                    // Сортировка по timestamp
+                    messages.sort((a, b) => a.timestamp - b.timestamp);
+                    
+                    // Отображаем сообщения
+                    messages.forEach((messageData) => {
                         addMessageToDOM(messageData);
                     });
+                    
+                    // Автопрокрутка вниз
+                    setTimeout(() => {
+                        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                    }, 100);
                 } else {
                     messagesDiv.innerHTML = '<div class="no-messages">Пока нет сообщений. Будьте первым!</div>';
                 }
-                
-                // Прокручиваем вниз
-                messagesDiv.scrollTop = messagesDiv.scrollHeight;
-            });
-
-            // Слушаем новые сообщения
-            messagesRef.on('child_added', (snapshot) => {
-                const messageData = snapshot.val();
-                addMessageToDOM(messageData);
-                
-                // Автопрокрутка вниз
-                setTimeout(() => {
-                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-                }, 100);
+            }, (error) => {
+                console.error("❌ Ошибка загрузки сообщений:", error);
+                messagesDiv.innerHTML = `<div class="alert alert-danger p-3">Ошибка: ${error.message}</div>`;
+                showConnectionStatus("Ошибка подключения к чату", "danger");
             });
         }
-
+    
         function addMessageToDOM(messageData) {
             const messagesDiv = document.getElementById('messages');
-            // Убираем placeholder если есть
-            if (messagesDiv.querySelector('.no-messages')) {
-                messagesDiv.innerHTML = '';
-            }
-            
             const messageDiv = document.createElement('div');
             messageDiv.className = 'message ' + (messageData.userId === currentUser?.uid ? 'own' : 'other');
-
-            // Форматируем время
+    
             const date = new Date(messageData.timestamp);
             const timeString = date.toLocaleTimeString('ru-RU', { 
                 hour: '2-digit', 
                 minute: '2-digit',
                 hour12: false
             });
-
-            // Экранируем текст от XSS
+    
             const safeMessage = escapeHtml(messageData.message);
             const safeUsername = escapeHtml(messageData.username);
-
+    
             messageDiv.innerHTML = `
                 <div class="message-user">${safeUsername}</div>
                 <div class="message-content">${safeMessage}</div>
                 <div class="message-time">${timeString}</div>
             `;
-
+    
             messagesDiv.appendChild(messageDiv);
         }
-
-        // Защита от XSS
+    
         function escapeHtml(unsafe) {
             if (typeof unsafe !== 'string') return '';
             return unsafe
@@ -370,28 +404,61 @@
                 .replace(/"/g, "&quot;")
                 .replace(/'/g, "&#039;");
         }
-
+    
         function showError(message) {
             const errorDiv = document.getElementById('authError');
             errorDiv.textContent = message;
             errorDiv.style.display = 'block';
-            // Автоматическое скрытие через 5 секунд
             setTimeout(() => {
                 if (errorDiv.textContent === message) {
                     hideError();
                 }
             }, 5000);
         }
-
+    
         function hideError() {
             document.getElementById('authError').style.display = 'none';
         }
-
-        // Горячая клавиша: Ctrl+Enter для отправки
+    
+        // Индикатор подключения
+        function showConnectionStatus(message, type = "warning") {
+            let statusDiv = document.getElementById('connectionStatus');
+            if (!statusDiv) {
+                statusDiv = document.createElement('div');
+                statusDiv.id = 'connectionStatus';
+                statusDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed bottom-0 start-50 translate-middle-x m-3`;
+                statusDiv.style.zIndex = '1000';
+                statusDiv.style.maxWidth = '300px';
+                document.body.appendChild(statusDiv);
+            }
+            statusDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed bottom-0 start-50 translate-middle-x m-3`;
+            statusDiv.innerHTML = `${message} <button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+        }
+    
+        function hideConnectionStatus() {
+            const statusDiv = document.getElementById('connectionStatus');
+            if (statusDiv) {
+                statusDiv.remove();
+            }
+        }
+    
+        // Горячие клавиши
         document.getElementById('messageInput').addEventListener('keydown', (e) => {
-            if (e.ctrlKey && e.key === 'Enter') {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
                 sendMessage();
             }
+        });
+    
+        // Автофокус на поле ввода при открытии чата
+        const observer = new MutationObserver(() => {
+            if (document.getElementById('chatContainer').style.display !== 'none') {
+                document.getElementById('messageInput').focus();
+            }
+        });
+        observer.observe(document.getElementById('chatContainer'), {
+            attributes: true,
+            attributeFilter: ['style']
         });
     </script>
 </body>
